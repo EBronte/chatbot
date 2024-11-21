@@ -1,56 +1,55 @@
-import streamlit as st
-from openai import OpenAI
+import streamlit as st  
+from openai import OpenAI  
 
-# Show title and description.
-st.title("💬 Chatbot")
-st.write(
-    "This is a simple chatbot that uses OpenAI's GPT-3.5 model to generate responses. "
-    "To use this app, you need to provide an OpenAI API key, which you can get [here](https://platform.openai.com/account/api-keys). "
-    "You can also learn how to build this app step by step by [following our tutorial](https://docs.streamlit.io/develop/tutorials/llms/build-conversational-apps)."
-)
+# OpenAI 설정  
+client = OpenAI(api_key=st.secrets["openai"]["api_key"])  
 
-# Ask user for their OpenAI API key via `st.text_input`.
-# Alternatively, you can store the API key in `./.streamlit/secrets.toml` and access it
-# via `st.secrets`, see https://docs.streamlit.io/develop/concepts/connections/secrets-management
-openai_api_key = st.text_input("OpenAI API Key", type="password")
-if not openai_api_key:
-    st.info("Please add your OpenAI API key to continue.", icon="🗝️")
-else:
+# 페이지 설정  
+st.title("🎨 작가 스타일 이미지 생성기")  
 
-    # Create an OpenAI client.
-    client = OpenAI(api_key=openai_api_key)
+# 작가 스타일 정의  
+artists = {  
+    "에드워드 호퍼 (미국)": "beautiful landscape in Edward Hopper style, with strong light and shadows, urban American scene",  
+    "잭슨 폴록 (미국)": "beautiful landscape in Jackson Pollock style, abstract expressionist, dynamic composition",  
+    "박수근 (한국)": "beautiful landscape in Park Soo-keun style, Korean traditional scene, earth tones",  
+    "이중섭 (한국)": "beautiful landscape in Lee Jung-seob style, Korean folk elements, dynamic composition"  
+}  
 
-    # Create a session state variable to store the chat messages. This ensures that the
-    # messages persist across reruns.
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+# 사이드바 컨트롤  
+st.sidebar.header("설정")  
+artist = st.sidebar.selectbox("작가 선택", list(artists.keys()))  
+size = st.sidebar.select_slider(  
+    "이미지 크기",  
+    options=["256x256", "512x512", "1024x1024"],  
+    value="512x512"  
+)  
 
-    # Display the existing chat messages via `st.chat_message`.
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+# 이미지 생성  
+if st.sidebar.button("이미지 생성"):  
+    try:  
+        with st.spinner("이미지 생성 중..."):  
+            response = client.images.generate(  
+                prompt=artists[artist],  
+                n=1,  
+                size=size  
+            )  
+            
+            # 이미지 표시  
+            st.image(response.data[0].url, caption=f"{artist} 스타일", use_column_width=True)  
+            
+    except Exception as e:  
+        st.error(f"오류 발생: {str(e)}")  
 
-    # Create a chat input field to allow the user to enter a message. This will display
-    # automatically at the bottom of the page.
-    if prompt := st.chat_input("What is up?"):
+# 작가 정보  
+st.markdown("---")  
+st.subheader("작가 소개")  
 
-        # Store and display the current prompt.
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+artist_info = {  
+    "에드워드 호퍼 (미국)": "미국의 사실주의 화가로, 도시의 고독과 현대성을 표현했습니다.",  
+    "잭슨 폴록 (미국)": "추상표현주의의 대표 작가로, 액션 페인팅 기법으로 유명합니다.",  
+    "박수근 (한국)": "한국의 모더니즘 화가로, 서민적 소재와 질박한 화풍이 특징입니다.",  
+    "이중섭 (한국)": "한국 근대미술의 대표 작가로, 민족적 정서를 담은 작품을 그렸습니다."  
+}  
 
-        # Generate a response using the OpenAI API.
-        stream = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": m["role"], "content": m["content"]}
-                for m in st.session_state.messages
-            ],
-            stream=True,
-        )
-
-        # Stream the response to the chat using `st.write_stream`, then store it in 
-        # session state.
-        with st.chat_message("assistant"):
-            response = st.write_stream(stream)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+st.write(artist_info[artist])  
+st.caption("Powered by DALL-E")
